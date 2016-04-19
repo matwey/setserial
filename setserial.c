@@ -77,9 +77,14 @@ struct serial_type_struct {
 #define CMD_FLOW_ON     16
 #define CMD_RX_TMOUT    17
 #define CMD_DMA_CHAN    18
+#define CMD_RS485       19
+#define CMD_RS485_DELAY_AFTER  20
+#define CMD_RS485_DELAY_BEFORE 21
 
 #define FLAG_CAN_INVERT	0x0001
 #define FLAG_NEED_ARG	0x0002
+
+#define SER_RS485_MASK  0x1f
 
 struct flag_type_table {
 	int	cmd;
@@ -125,6 +130,14 @@ struct flag_type_table {
 	CMD_FLOW_ON,    "flow_on",      0,              0,              0, FLAG_NEED_ARG,
 	CMD_RX_TMOUT,   "rx_timeout",   0,              0,              0, FLAG_NEED_ARG,
 	CMD_DMA_CHAN,   "dma_channel",  0,              0,              0, FLAG_NEED_ARG,
+#endif
+#ifdef TIOCSRS485
+	CMD_RS485,      "rs485_enabled",        SER_RS485_ENABLED,        SER_RS485_MASK, 2, FLAG_CAN_INVERT,
+	CMD_RS485,      "rs485_rts_on_send",    SER_RS485_RTS_ON_SEND,    SER_RS485_MASK, 2, FLAG_CAN_INVERT,
+	CMD_RS485,      "rs485_rts_after_send", SER_RS485_RTS_AFTER_SEND, SER_RS485_MASK, 2, FLAG_CAN_INVERT,
+	CMD_RS485,      "rs485_rx_during_tx",   SER_RS485_RX_DURING_TX,   SER_RS485_MASK, 2, FLAG_CAN_INVERT,
+	CMD_RS485_DELAY_AFTER,  "rs485_delay_after",  0, 0,             2, FLAG_NEED_ARG,
+	CMD_RS485_DELAY_BEFORE, "rs485_delay_before", 0, 0,             2, FLAG_NEED_ARG,
 #endif
 	0,		0,		0,		0,		0, 0,
 };
@@ -413,6 +426,28 @@ void set_hayesesp(int fd, int cmd, int arg)
 }
 #endif
 
+#ifdef TIOCSRS485
+void print_rs485_flags(struct serial_rs485* rs485conf,
+		 char *prefix, char *postfix)
+{
+	print_flags_generic(prefix, postfix, CMD_RS485, rs485conf->flags);
+}
+
+void print_rs485(int fd)
+{
+	struct serial_rs485 rs485conf;
+
+	if (ioctl(fd, TIOCGRS485, &rs485conf) < 0)
+		return;
+
+	printf("\tRS485 configuration:\n");
+	print_rs485_flags(&rs485conf, "\t\tFlags: ", "\n");
+	printf("\t\tDelay before send: %u us., after send: %u us.\n",
+		rs485conf.delay_rts_before_send,
+		rs485conf.delay_rts_after_send);
+}
+#endif
+
 void get_serial(char *device)
 {
 	struct serial_struct serinfo;
@@ -457,6 +492,9 @@ void get_serial(char *device)
 #ifdef TIOCGHAYESESP
 		print_hayesesp(fd);
 #endif
+#ifdef TIOCSRS485
+		print_rs485(fd);
+#endif
 	} else if (verbosity==0) {
 		if (serinfo.type) {
 			printf("%s at 0x%.4x (irq = %d) is a %s",
@@ -478,6 +516,10 @@ void get_serial(char *device)
 void set_serial(char *device, char ** arg)
 {
 	struct serial_struct old_serinfo, new_serinfo;
+#ifdef TIOCSRS485
+	struct serial_rs485 old_rs485conf, new_rs485conf;
+	int tiocgrs485_present = 1;
+#endif
 	struct	flag_type_table	*p;
 	int	fd;
 	int	do_invert = 0;
@@ -495,6 +537,17 @@ void set_serial(char *device, char ** arg)
 		exit(1);
 	}
 	new_serinfo = old_serinfo;
+#ifdef TIOCSRS485
+	if (ioctl(fd, TIOCGRS485, &old_rs485conf) < 0) {
+		if (errno == ENOTTY) {
+			tiocgrs485_present = 0;
+		} else {
+			perror("Cannot get serial rs485");
+			exit(1);
+		}
+	}
+	new_rs485conf = old_rs485conf;
+#endif
 	if (zero_flag)
 		new_serinfo.flags = 0;
 	while (*arg) {
@@ -604,6 +657,19 @@ void set_serial(char *device, char ** arg)
 			set_hayesesp(fd, p->cmd, atonum(*arg++));
 			break;
 #endif
+#ifdef TIOCSRS485
+		case CMD_RS485:
+			new_rs485conf.flags &= ~p->mask;
+			if (!do_invert)
+				new_rs485conf.flags |= p->bits;
+			break;
+		case CMD_RS485_DELAY_AFTER:
+			new_rs485conf.delay_rts_after_send = atonum(*arg++);
+			break;
+		case CMD_RS485_DELAY_BEFORE:
+			new_rs485conf.delay_rts_before_send = atonum(*arg++);
+			break;
+#endif
 		default:
 			fprintf(stderr, "Internal error: unhandled cmd #%d\n", p->cmd);
 			exit(1);
@@ -613,6 +679,12 @@ void set_serial(char *device, char ** arg)
 		perror("Cannot set serial info");
 		exit(1);
 	}
+#ifdef TIOCSRS485
+	if (tiocgrs485_present && ioctl(fd, TIOCSRS485, &new_rs485conf) < 0) {
+		perror("Cannot set serial rs485");
+		exit(1);
+	}
+#endif
 	close(fd);
 	if (verbose_flag)
 		get_serial(device);
@@ -700,6 +772,14 @@ fprintf(stderr, "\t* port\t\tset the I/O port\n");
 	fprintf(stderr, "\t* flow_on\tSet hardware flow on level (ESP-only)\n");
 	fprintf(stderr, "\t* rx_timeout\tSet receive timeout (ESP-only)\n");
 	fprintf(stderr, "\t* dma_channel\tSet DMA channel (ESP-only)\n");
+#endif
+#ifdef TIOCSRS485
+	fprintf(stderr, "\t^ rs485_enabled\tEnable or disable RS485\n");
+	fprintf(stderr, "\t^ rs485_rts_on_send\tSet RTS on send\n");
+	fprintf(stderr, "\t^ rs485_rts_after_send\tSet RTS after send\n");
+	fprintf(stderr, "\t^ rs485_rx_during_tx\tEnable RX during TX\n");
+	fprintf(stderr, "\t* rs485_delay_after\tDelay after send\n");
+	fprintf(stderr, "\t* rs485_delay_before\tDelay before send\n");
 #endif
 	fprintf(stderr, "\n");
 	fprintf(stderr, "\t  spd_hi\tuse 56kb instead of 38.4kb\n");
