@@ -165,17 +165,13 @@ int atonum(char *s)
 	return n;
 }
 
-void print_flags(struct serial_struct *serinfo,
-		 char *prefix, char *postfix)
+void print_flags_generic(char *prefix, char *postfix, int cmd, int flags)
 {
 	struct	flag_type_table	*p;
-	int	flags;
 	int	first = 1;
-
-	flags = serinfo->flags;
 	
 	for (p = flag_type_tbl; p->name; p++) {
-		if (p->cmd != CMD_FLAG)
+		if (p->cmd != cmd)
 			continue;
 		if (verbosity == -1) {
 			if ((flags & p->mask) == p->bits)
@@ -196,6 +192,11 @@ void print_flags(struct serial_struct *serinfo,
 	
 	if (!first)
 		printf("%s", postfix);
+}
+void print_flags(struct serial_struct *serinfo,
+		 char *prefix, char *postfix)
+{
+	print_flags_generic(prefix, postfix, CMD_FLAG, serinfo->flags);
 }
 
 #ifdef TIOCSERGETMULTI
