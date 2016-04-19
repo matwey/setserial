@@ -10,10 +10,15 @@
 #ifndef _LINUX_SERIAL_H
 #define _LINUX_SERIAL_H
 
+#include <linux/types.h>
+
+#include <linux/tty_flags.h>
+
+
 struct serial_struct {
 	int	type;
 	int	line;
-	int	port;
+	unsigned int	port;
 	int	irq;
 	int	flags;
 	int	xmit_fifo_size;
@@ -27,7 +32,8 @@ struct serial_struct {
 	unsigned short	closing_wait2; /* no longer used... */
 	unsigned char	*iomem_base;
 	unsigned short	iomem_reg_shift;
-	int	reserved[2];
+	unsigned int	port_high;
+	unsigned long	iomap_base;	/* cookie passed into ioremap */
 };
 
 /*
@@ -53,66 +59,18 @@ struct serial_struct {
 #define PORT_16C950	10	/* Oxford Semiconductor */
 #define PORT_16654	11
 #define PORT_16850	12
-#define PORT_MAX	12
+#define PORT_RSA	13	/* RSA-DV II/S card */
+#define PORT_MAX	13
 
 #define SERIAL_IO_PORT	0
 #define SERIAL_IO_HUB6	1
 #define SERIAL_IO_MEM	2
-#define SERIAL_IO_GSC	3
-
-struct serial_uart_config {
-	char	*name;
-	int	dfl_xmit_fifo_size;
-	int	flags;
-};
 
 #define UART_CLEAR_FIFO		0x01
 #define UART_USE_FIFO		0x02
 #define UART_STARTECH		0x04
+#define UART_NATSEMI		0x08
 
-/*
- * Definitions for async_struct (and serial_struct) flags field
- */
-#define ASYNC_HUP_NOTIFY 0x0001 /* Notify getty on hangups and closes 
-				   on the callout port */
-#define ASYNC_FOURPORT  0x0002	/* Set OU1, OUT2 per AST Fourport settings */
-#define ASYNC_SAK	0x0004	/* Secure Attention Key (Orange book) */
-#define ASYNC_SPLIT_TERMIOS 0x0008 /* Separate termios for dialin/callout */
-
-#define ASYNC_SPD_MASK	0x1030
-#define ASYNC_SPD_HI	0x0010	/* Use 56000 instead of 38400 bps */
-
-#define ASYNC_SPD_VHI	0x0020  /* Use 115200 instead of 38400 bps */
-#define ASYNC_SPD_CUST	0x0030  /* Use user-specified divisor */
-
-#define ASYNC_SKIP_TEST	0x0040 /* Skip UART test during autoconfiguration */
-#define ASYNC_AUTO_IRQ  0x0080 /* Do automatic IRQ during autoconfiguration */
-#define ASYNC_SESSION_LOCKOUT 0x0100 /* Lock out cua opens based on session */
-#define ASYNC_PGRP_LOCKOUT    0x0200 /* Lock out cua opens based on pgrp */
-#define ASYNC_CALLOUT_NOHUP   0x0400 /* Don't do hangups for cua device */
-
-#define ASYNC_HARDPPS_CD	0x0800	/* Call hardpps when CD goes high  */
-
-#define ASYNC_SPD_SHI	0x1000	/* Use 230400 instead of 38400 bps */
-#define ASYNC_SPD_WARP	0x1010	/* Use 460800 instead of 38400 bps */
-
-#define ASYNC_LOW_LATENCY 0x2000 /* Request low latency behaviour */
-
-#define ASYNC_FLAGS	0x3FFF	/* Possible legal async flags */
-#define ASYNC_USR_MASK	0x3430	/* Legal flags that non-privileged
-				 * users can set or reset */
-
-/* Internal flags used only by kernel/chr_drv/serial.c */
-#define ASYNC_INITIALIZED	0x80000000 /* Serial port was initialized */
-#define ASYNC_CALLOUT_ACTIVE	0x40000000 /* Call out device is active */
-#define ASYNC_NORMAL_ACTIVE	0x20000000 /* Normal device is active */
-#define ASYNC_BOOT_AUTOCONF	0x10000000 /* Autoconfigure port on bootup */
-#define ASYNC_CLOSING		0x08000000 /* Serial port is closing */
-#define ASYNC_CTS_FLOW		0x04000000 /* Do CTS flow control */
-#define ASYNC_CHECK_CD		0x02000000 /* i.e., CLOCAL */
-#define ASYNC_SHARE_IRQ		0x01000000 /* for multifunction cards */
-
-#define ASYNC_INTERNAL_FLAGS	0xFF000000 /* Internal flags */
 
 /*
  * Multiport serial configuration structure --- external structure
@@ -143,11 +101,26 @@ struct serial_icounter_struct {
 	int reserved[9];
 };
 
+/*
+ * Serial interface for controlling RS485 settings on chips with suitable
+ * support. Set with TIOCSRS485 and get with TIOCGRS485 if supported by your
+ * platform. The set function returns the new state, with any unsupported bits
+ * reverted appropriately.
+ */
 
-#ifdef __KERNEL__
-/* Export to allow PCMCIA to use this - Dave Hinds */
-extern int register_serial(struct serial_struct *req);
-extern void unregister_serial(int line);
+struct serial_rs485 {
+	__u32	flags;			/* RS485 feature flags */
+#define SER_RS485_ENABLED		(1 << 0)	/* If enabled */
+#define SER_RS485_RTS_ON_SEND		(1 << 1)	/* Logical level for
+							   RTS pin when
+							   sending */
+#define SER_RS485_RTS_AFTER_SEND	(1 << 2)	/* Logical level for
+							   RTS pin after sent*/
+#define SER_RS485_RX_DURING_TX		(1 << 4)
+	__u32	delay_rts_before_send;	/* Delay before send (milliseconds) */
+	__u32	delay_rts_after_send;	/* Delay after send (milliseconds) */
+	__u32	padding[5];		/* Memory is cheap, new structs
+					   are a royal PITA .. */
+};
 
-#endif /* __KERNEL__ */
 #endif /* _LINUX_SERIAL_H */
