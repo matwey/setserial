@@ -84,8 +84,6 @@ struct serial_type_struct {
 #define FLAG_CAN_INVERT	0x0001
 #define FLAG_NEED_ARG	0x0002
 
-#define SER_RS485_MASK  0x1f
-
 struct flag_type_table {
 	int	cmd;
 	char	*name;
@@ -132,10 +130,10 @@ struct flag_type_table {
 	CMD_DMA_CHAN,   "dma_channel",  0,              0,              0, FLAG_NEED_ARG,
 #endif
 #ifdef TIOCSRS485
-	CMD_RS485,      "rs485_enabled",        SER_RS485_ENABLED,        SER_RS485_MASK, 2, FLAG_CAN_INVERT,
-	CMD_RS485,      "rs485_rts_on_send",    SER_RS485_RTS_ON_SEND,    SER_RS485_MASK, 2, FLAG_CAN_INVERT,
-	CMD_RS485,      "rs485_rts_after_send", SER_RS485_RTS_AFTER_SEND, SER_RS485_MASK, 2, FLAG_CAN_INVERT,
-	CMD_RS485,      "rs485_rx_during_tx",   SER_RS485_RX_DURING_TX,   SER_RS485_MASK, 2, FLAG_CAN_INVERT,
+	CMD_RS485,      "rs485_enabled",        SER_RS485_ENABLED,        SER_RS485_ENABLED,        2, FLAG_CAN_INVERT,
+	CMD_RS485,      "rs485_rts_on_send",    SER_RS485_RTS_ON_SEND,    SER_RS485_RTS_ON_SEND,    2, FLAG_CAN_INVERT,
+	CMD_RS485,      "rs485_rts_after_send", SER_RS485_RTS_AFTER_SEND, SER_RS485_RTS_AFTER_SEND, 2, FLAG_CAN_INVERT,
+	CMD_RS485,      "rs485_rx_during_tx",   SER_RS485_RX_DURING_TX,   SER_RS485_RX_DURING_TX,   2, FLAG_CAN_INVERT,
 	CMD_RS485_DELAY_AFTER,  "rs485_delay_after",  0, 0,             2, FLAG_NEED_ARG,
 	CMD_RS485_DELAY_BEFORE, "rs485_delay_before", 0, 0,             2, FLAG_NEED_ARG,
 #endif
